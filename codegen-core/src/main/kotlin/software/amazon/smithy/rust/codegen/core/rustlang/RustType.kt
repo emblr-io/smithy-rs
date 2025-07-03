@@ -536,7 +536,7 @@ class Attribute(val inner: Writable, val isDeriveHelper: Boolean = false) {
     fun serdeSerialize(): Attribute {
         return Attribute(
             cfgAttr(
-                all(writable("aws_sdk_unstable"), feature("serde-serialize")),
+                feature("serde-serialize"),
                 derive(RuntimeType.SerdeSerialize),
             ),
         )
@@ -545,7 +545,7 @@ class Attribute(val inner: Writable, val isDeriveHelper: Boolean = false) {
     fun serdeDeserialize(): Attribute {
         return Attribute(
             cfgAttr(
-                all(writable("aws_sdk_unstable"), feature("serde-deserialize")),
+                feature("serde-deserialize"),
                 derive(RuntimeType.SerdeDeserialize),
             ),
         )
@@ -554,10 +554,7 @@ class Attribute(val inner: Writable, val isDeriveHelper: Boolean = false) {
     fun serdeSkip(): Attribute {
         return Attribute(
             cfgAttr(
-                all(
-                    writable("aws_sdk_unstable"),
-                    any(feature("serde-serialize"), feature("serde-deserialize")),
-                ),
+                any(feature("serde-serialize"), feature("serde-deserialize")),
                 serde("skip"),
             ),
         )
@@ -566,10 +563,7 @@ class Attribute(val inner: Writable, val isDeriveHelper: Boolean = false) {
     fun serdeSerializeOrDeserialize(): Attribute {
         return Attribute(
             cfg(
-                all(
-                    writable("aws_sdk_unstable"),
-                    any(feature("serde-serialize"), feature("serde-deserialize")),
-                ),
+                any(feature("serde-serialize"), feature("serde-deserialize")),
             ),
         )
     }

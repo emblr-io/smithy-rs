@@ -24,7 +24,6 @@ import software.amazon.smithy.model.traits.SensitiveTrait
 import software.amazon.smithy.rust.codegen.core.rustlang.Attribute
 import software.amazon.smithy.rust.codegen.core.rustlang.RustMetadata
 import software.amazon.smithy.rust.codegen.core.rustlang.Visibility
-import software.amazon.smithy.rust.codegen.core.rustlang.writable
 import software.amazon.smithy.rust.codegen.core.util.hasTrait
 
 /**
@@ -101,7 +100,7 @@ fun containerDefaultMetadata(
     allAttributes.add(
         Attribute(
             Attribute.cfgAttr(
-                Attribute.all(writable("aws_sdk_unstable"), Attribute.feature("serde-serialize")),
+                Attribute.feature("serde-serialize"),
                 Attribute.derive(RuntimeType.SerdeSerialize),
             ),
         )
@@ -111,7 +110,7 @@ fun containerDefaultMetadata(
     allAttributes.add(
         Attribute(
             Attribute.cfgAttr(
-                Attribute.all(writable("aws_sdk_unstable"), Attribute.feature("serde-deserialize")),
+                Attribute.feature("serde-deserialize"),
                 Attribute.derive(RuntimeType.SerdeDeserialize),
             ),
         )

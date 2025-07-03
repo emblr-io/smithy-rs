@@ -141,13 +141,13 @@ mod test {
 }
 
 #[cfg(all(
-    aws_sdk_unstable,
     feature = "serde-serialize",
     feature = "serde-deserialize"
 ))]
 mod test_serde {
     use crate::Blob;
     use serde::{Deserialize, Serialize};
+    #[allow(unused_imports)]
     use std::collections::HashMap;
 
     #[derive(Deserialize, Serialize, Debug, PartialEq)]
