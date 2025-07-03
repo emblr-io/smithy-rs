@@ -44,3 +44,12 @@ impl<T, E> EventReceiver<T, E> {
         self.inner.recv().await
     }
 }
+
+// This Default implementation is only used for serde deserialization when the field is skipped.
+// It should never be used in normal operation since EventReceiver fields are always provided
+// by the service response.
+impl<T, E> Default for EventReceiver<T, E> {
+    fn default() -> Self {
+        panic!("EventReceiver::default() should only be used by serde for skipped fields")
+    }
+}

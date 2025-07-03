@@ -23,7 +23,9 @@ import software.amazon.smithy.model.traits.EnumTrait
 import software.amazon.smithy.model.traits.SensitiveTrait
 import software.amazon.smithy.rust.codegen.core.rustlang.Attribute
 import software.amazon.smithy.rust.codegen.core.rustlang.RustMetadata
+import software.amazon.smithy.rust.codegen.core.rustlang.RustType
 import software.amazon.smithy.rust.codegen.core.rustlang.Visibility
+import software.amazon.smithy.rust.codegen.core.util.isStreaming
 import software.amazon.smithy.rust.codegen.core.util.hasTrait
 
 /**
@@ -126,11 +128,11 @@ fun containerDefaultMetadata(
  * changes are fine when generating server code.
  */
 class BaseSymbolMetadataProvider(
-    base: RustSymbolProvider,
+    private val base: RustSymbolProvider,
     private val additionalAttributes: List<Attribute>,
 ) : SymbolMetadataProvider(base) {
-    override fun memberMeta(memberShape: MemberShape): RustMetadata =
-        when (val container = model.expectShape(memberShape.container)) {
+    override fun memberMeta(memberShape: MemberShape): RustMetadata {
+        val baseMetadata = when (val container = model.expectShape(memberShape.container)) {
             is StructureShape -> RustMetadata(visibility = Visibility.PUBLIC)
 
             is UnionShape, is CollectionShape, is MapShape -> RustMetadata(visibility = Visibility.PUBLIC)
@@ -142,6 +144,27 @@ class BaseSymbolMetadataProvider(
 
             else -> TODO("Unrecognized container type: $container")
         }
+
+        // Add serde(skip) to ByteStream and EventReceiver fields when serde features are enabled
+        val memberSymbol = base.toSymbol(memberShape)
+        val isEventReceiver = memberSymbol.rustType().let { rustType ->
+            rustType is RustType.Application && rustType.type.name == "EventReceiver"
+        }
+        
+        return if (memberShape.isStreaming(model) || isEventReceiver) {
+            val serdeSkipAttributes = listOf(
+                Attribute(
+                    Attribute.cfgAttr(
+                        Attribute.any(Attribute.feature("serde-serialize"), Attribute.feature("serde-deserialize")),
+                        Attribute.serde("skip")
+                    )
+                )
+            )
+            baseMetadata.copy(additionalAttributes = baseMetadata.additionalAttributes + serdeSkipAttributes)
+        } else {
+            baseMetadata
+        }
+    }
 
     override fun structureMeta(structureShape: StructureShape) =
         containerDefaultMetadata(structureShape, model, additionalAttributes)
