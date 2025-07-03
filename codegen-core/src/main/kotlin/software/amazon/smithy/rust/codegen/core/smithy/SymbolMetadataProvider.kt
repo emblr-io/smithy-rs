@@ -24,6 +24,7 @@ import software.amazon.smithy.model.traits.SensitiveTrait
 import software.amazon.smithy.rust.codegen.core.rustlang.Attribute
 import software.amazon.smithy.rust.codegen.core.rustlang.RustMetadata
 import software.amazon.smithy.rust.codegen.core.rustlang.Visibility
+import software.amazon.smithy.rust.codegen.core.rustlang.writable
 import software.amazon.smithy.rust.codegen.core.util.hasTrait
 
 /**
@@ -93,7 +94,30 @@ fun containerDefaultMetadata(
         derives.remove(RuntimeType.Debug)
     }
 
-    return RustMetadata(derives, additionalAttributes, Visibility.PUBLIC)
+    // Add conditional serde derives
+    val allAttributes = additionalAttributes.toMutableList()
+
+    // Add serde serialize attribute: #[cfg_attr(all(aws_sdk_unstable, feature = "serde-serialize"), derive(serde::Serialize))]
+    allAttributes.add(
+        Attribute(
+            Attribute.cfgAttr(
+                Attribute.all(writable("aws_sdk_unstable"), Attribute.feature("serde-serialize")),
+                Attribute.derive(RuntimeType.SerdeSerialize),
+            ),
+        )
+    )
+
+    // Add serde deserialize attribute: #[cfg_attr(all(aws_sdk_unstable, feature = "serde-deserialize"), derive(serde::Deserialize))]
+    allAttributes.add(
+        Attribute(
+            Attribute.cfgAttr(
+                Attribute.all(writable("aws_sdk_unstable"), Attribute.feature("serde-deserialize")),
+                Attribute.derive(RuntimeType.SerdeDeserialize),
+            ),
+        )
+    )
+
+    return RustMetadata(derives, allAttributes, Visibility.PUBLIC)
 }
 
 /**

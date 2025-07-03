@@ -54,6 +54,7 @@ target/
 .project
 .settings
 .classpath
+kls_database.db
 
 # tools
 .tool-versions
