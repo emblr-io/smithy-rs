@@ -38,6 +38,8 @@ pub const EMPTY_ERROR_METADATA: ErrorMetadata = ErrorMetadata {
 /// For many services, Errors are modeled. However, many services only partially model errors or don't
 /// model errors at all. In these cases, the SDK will return this generic error type to expose the
 /// `code`, `message` and `request_id`.
+#[cfg_attr(all(aws_sdk_unstable, feature = "serde-serialize"), derive(::serde::Serialize))]
+#[cfg_attr(all(aws_sdk_unstable, feature = "serde-deserialize"), derive(::serde::Deserialize))]
 #[derive(Debug, Eq, PartialEq, Default, Clone)]
 pub struct ErrorMetadata {
     code: Option<String>,
