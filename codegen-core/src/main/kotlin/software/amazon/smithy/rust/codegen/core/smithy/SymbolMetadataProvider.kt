@@ -121,6 +121,43 @@ fun containerDefaultMetadata(
     return RustMetadata(derives, allAttributes, Visibility.PUBLIC)
 }
 
+fun containerDefaultMetadataWithoutDeserialize(
+    shape: Shape,
+    model: Model,
+    additionalAttributes: List<Attribute> = emptyList(),
+): RustMetadata {
+    val derives = mutableSetOf(RuntimeType.Debug, RuntimeType.PartialEq, RuntimeType.Clone)
+
+    val isSensitive =
+        shape.hasTrait<SensitiveTrait>() ||
+            // Checking the shape's direct members for the sensitive trait should suffice.
+            // Whether their descendants, i.e. a member's member, is sensitive does not
+            // affect the inclusion/exclusion of the derived `Debug` trait of _this_ container
+            // shape; any sensitive descendant should still be printed as redacted.
+            shape.members().any { it.getMemberTrait(model, SensitiveTrait::class.java).isPresent }
+
+    if (isSensitive) {
+        derives.remove(RuntimeType.Debug)
+    }
+
+    // Add conditional serde derives (only serialize, not deserialize)
+    val allAttributes = additionalAttributes.toMutableList()
+
+    // Add serde serialize attribute: #[cfg_attr(all(aws_sdk_unstable, feature = "serde-serialize"), derive(serde::Serialize))]
+    allAttributes.add(
+        Attribute(
+            Attribute.cfgAttr(
+                Attribute.feature("serde-serialize"),
+                Attribute.derive(RuntimeType.SerdeSerialize),
+            ),
+        )
+    )
+
+    // Don't add serde deserialize attribute for structures containing EventStreamSender
+
+    return RustMetadata(derives, allAttributes, Visibility.PUBLIC)
+}
+
 /**
  * The base metadata supports a set of attributes that are used by generators to decorate code.
  *
@@ -145,13 +182,16 @@ class BaseSymbolMetadataProvider(
             else -> TODO("Unrecognized container type: $container")
         }
 
-        // Add serde(skip) to ByteStream and EventReceiver fields when serde features are enabled
+        // Add serde(skip) to ByteStream and EventReceiver/EventStreamSender fields when serde features are enabled
         val memberSymbol = base.toSymbol(memberShape)
         val isEventReceiver = memberSymbol.rustType().let { rustType ->
             rustType is RustType.Application && rustType.type.name == "EventReceiver"
         }
+        val isEventStreamSender = memberSymbol.rustType().let { rustType ->
+            rustType is RustType.Application && rustType.type.name == "EventStreamSender"
+        }
         
-        return if (memberShape.isStreaming(model) || isEventReceiver) {
+        return if (memberShape.isStreaming(model) || isEventReceiver || isEventStreamSender) {
             val serdeSkipAttributes = listOf(
                 Attribute(
                     Attribute.cfgAttr(
@@ -166,8 +206,22 @@ class BaseSymbolMetadataProvider(
         }
     }
 
-    override fun structureMeta(structureShape: StructureShape) =
-        containerDefaultMetadata(structureShape, model, additionalAttributes)
+    override fun structureMeta(structureShape: StructureShape): RustMetadata {
+        // Check if structure contains EventStreamSender members
+        val hasEventStreamSender = structureShape.members().any { memberShape ->
+            val memberSymbol = base.toSymbol(memberShape)
+            memberSymbol.rustType().let { rustType ->
+                rustType is RustType.Application && rustType.type.name == "EventStreamSender"
+            }
+        }
+        
+        return if (hasEventStreamSender) {
+            // For structures containing EventStreamSender, don't add serde::Deserialize
+            containerDefaultMetadataWithoutDeserialize(structureShape, model, additionalAttributes)
+        } else {
+            containerDefaultMetadata(structureShape, model, additionalAttributes)
+        }
+    }
 
     override fun unionMeta(unionShape: UnionShape) = containerDefaultMetadata(unionShape, model, additionalAttributes)
 
